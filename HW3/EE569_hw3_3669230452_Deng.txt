@@ -1,0 +1,2108 @@
+//(1) Name : Zhiwei Deng
+//(2) USC ID Number : 3669230452
+//(3) USC Email : zhiweide@usc.edu
+//(4) Submission Date : 03/03/2020
+
+%(1) Name : Zhiwei Deng
+%(2) USC ID Number : 3669230452
+%(3) USC Email : zhiweide@usc.edu
+%(4) Submission Date : 03/03/2020
+
+function rcvr_img = inverse(im)
+    rcvr_img = uint8(zeros(512, 512, 3));
+    %Warping
+    for i = 1:512
+        for j = 1:512
+            %Check the Distance of the Pixels
+            dist = sqrt((i-256)^2+(j-256)^2);
+            %Get the Region and Transformed Coordinate
+            region = getRegion(i, j);
+            [x, y] = getCoord(region, i, j);
+            %Compute the Angle Cosine and Sine
+            c_theta = x / dist;
+            s_theta = y / dist;
+            %Compute the New Locations
+            [new_x, new_y] = computeLocation(c_theta, s_theta, x, y, region);
+            %Do the Bilinear Interpolation
+            value = bilinear(new_x, new_y, region, im);
+            rcvr_img(j,i,:) = value;
+        end
+    end
+    %Boundaries
+    for i = 1:511
+        rcvr_img(i,511,:) = rcvr_img(i,510,:);
+        rcvr_img(i,512,:) = rcvr_img(i,510,:);
+    end
+    for j = 1:511
+        rcvr_img(511,j,:) = rcvr_img(510,j,:);
+        rcvr_img(512,j,:) = rcvr_img(510,j,:);
+    end
+end
+
+%Get the Region of the Pixels
+function region = getRegion(i, j)
+    %Cross Lines
+    if (i == 256 || j == 256), region = 0; end
+    %Left Upper Corner
+    if (i < 256 && j < 256), region = 1; end
+    %Right Upper Corner
+    if (i < 256 && j > 256), region = 2; end
+    %Left Down Corner
+    if (i > 256 && j < 256), region = 3; end
+    %Right Down Corner
+    if (i > 256 && j > 256), region = 4; end
+    return;
+end
+
+%Get the Coordinates
+function [x, y] = getCoord(region, i, j)
+    %Cross Lines
+    if (region == 0)
+        x = i;
+        y = j;
+    end
+    %Left Upper Corner
+    if (region == 1)
+        x = 256 - i;
+        y = 256 - j;
+    end
+    %Right Upper Corner
+    if (region == 2)
+        x = 256 - i;
+        y = j - 256;
+    end
+    %Left Down Corner
+    if (region == 3)
+        x = i - 256;
+        y = 256 - j;
+    end
+    %Right Down Corner
+    if (region == 4)
+        x = i - 256;
+        y = j - 256;
+    end
+    return;
+end
+
+%Get the New Location
+function [new_x, new_y] = computeLocation(c_theta, s_theta, x, y, region)
+    if (c_theta > sqrt(2)/2)
+        total = 256 / c_theta;
+        new_x = x * 256 / total;
+        new_y = y * 256 / total;
+    else
+        total = 256 / s_theta;
+        new_x = x * 256 / total;
+        new_y = y * 256 / total;
+    end
+    %Get the Original Coordinate
+    %Left Upper
+    if (region == 0)
+        new_x = x;
+        new_y = y;
+    end
+    if (region == 1)
+        new_x = 256 - new_x;
+        new_y = 256 - new_y;
+    end
+    %Right Upper
+    if (region == 2)
+        new_x = 256 - new_x;
+        new_y = new_y + 256;
+    end
+    %Left Down
+    if (region == 3)
+        new_x = new_x + 256;
+        new_y = 256 - new_y;
+    end
+    %Right Down
+    if (region == 4)
+        new_x = new_x + 256;
+        new_y = new_y + 256;
+    end
+    %Bound
+    if (new_x < 1), new_x = 1; end
+    if (new_y < 1), new_y = 1; end
+    if (new_x > 512), new_x = 512; end
+    if (new_y > 512), new_y = 512; end
+end
+
+%Blinear Interpolation
+function value = bilinear(src_x, src_y, region, im)
+    if (region == 0)
+        value = im(src_y, src_x, :);
+        return;
+    end
+    floor_x = floor(src_x);
+	floor_y = floor(src_y);
+	top_x = min(floor_x + 1, 512);
+	top_y = min(floor_y + 1, 512);
+    value0 = (top_x - src_x) * im(floor_y, floor_x, :) + (src_x - floor_x) * im(floor_y, top_x, :);
+	value1 = (top_x - src_x) * im(top_y, floor_x, :) + (src_x - floor_x) * im(top_y, top_x, :);
+    value = int64((top_y - src_y) * value0 + (src_y - floor_y) * value1);
+end
+
+
+%(1) Name : Zhiwei Deng
+%(2) USC ID Number : 3669230452
+%(3) USC Email : zhiweide@usc.edu
+%(4) Submission Date : 03/03/2020
+
+%Left Image
+im1 = readraw('Images/left.raw', 720, 480, 3);
+%Middle Image
+im2 = readraw('Images/middle.raw', 720, 480, 3);
+%Right Image
+im3 = readraw('Images/right.raw', 720, 480, 3);
+
+grayImage1 = rgb2gray(im1);
+grayImage2 = rgb2gray(im2);
+grayImage3 = rgb2gray(im3);
+
+%Feature Extractions
+points1 = detectSURFFeatures(grayImage1);
+points2 = detectSURFFeatures(grayImage2);
+points3 = detectSURFFeatures(grayImage3);
+[features1, points1] = extractFeatures(grayImage1, points1);
+[features2, points2] = extractFeatures(grayImage2, points2);
+[features3, points3] = extractFeatures(grayImage3, points3);
+
+%Left and Middle
+indexPairs1 = matchFeatures(features2, features1, 'Unique', true);
+%Middle and Right
+indexPairs2 = matchFeatures(features3, features2, 'Unique', true);
+
+matchedPoints1 = points1(indexPairs1(:,2), :);
+matchedPoints2 = points2(indexPairs1(:,1), :);
+matchedPoints3 = points2(indexPairs2(:,2), :);
+matchedPoints4 = points3(indexPairs2(:,1), :);
+
+%The set of Control Points
+CtrlPoint1 = 10; CtrlPoint5 = 6;  %4
+CtrlPoint2 = 12; CtrlPoint6 = 24; %32
+CtrlPoint3 = 23; CtrlPoint7 = 52; %30
+CtrlPoint4 = 61; CtrlPoint8 = 62; %57
+
+%Choose the Control Points of Left Image
+leftCtrlPt1 = matchedPoints1.Location(CtrlPoint1, :);
+leftCtrlPt2 = matchedPoints1.Location(CtrlPoint2, :);
+leftCtrlPt3 = matchedPoints1.Location(CtrlPoint3, :);
+leftCtrlPt4 = matchedPoints1.Location(CtrlPoint4, :);
+%Choose the Control Points of Middle Image - With Left
+middCtrlPt1 = matchedPoints2.Location(CtrlPoint1, :);
+middCtrlPt2 = matchedPoints2.Location(CtrlPoint2, :);
+middCtrlPt3 = matchedPoints2.Location(CtrlPoint3, :);
+middCtrlPt4 = matchedPoints2.Location(CtrlPoint4, :);
+%Choose the Control Points of Middle Image - With Right
+middCtrlPt5 = matchedPoints3.Location(CtrlPoint5, :);
+middCtrlPt6 = matchedPoints3.Location(CtrlPoint6, :);
+middCtrlPt7 = matchedPoints3.Location(CtrlPoint7, :);
+middCtrlPt8 = matchedPoints3.Location(CtrlPoint8, :);
+%Choose the Control Points of Right Image
+rigtCtrlPt1 = matchedPoints4.Location(CtrlPoint5, :);
+rigtCtrlPt2 = matchedPoints4.Location(CtrlPoint6, :);
+rigtCtrlPt3 = matchedPoints4.Location(CtrlPoint7, :);
+rigtCtrlPt4 = matchedPoints4.Location(CtrlPoint8, :);
+
+%Show the Control Points with Local Positions
+
+originLocalx1 = leftCtrlPt1(1,1); originLocaly1 = leftCtrlPt1(1,2);
+originLocalx2 = leftCtrlPt2(1,1); originLocaly2 = leftCtrlPt2(1,2);
+originLocalx3 = leftCtrlPt3(1,1); originLocaly3 = leftCtrlPt3(1,2);
+originLocalx4 = leftCtrlPt4(1,1); originLocaly4 = leftCtrlPt4(1,2);
+originLocalx5 = rigtCtrlPt1(1,1); originLocaly5 = rigtCtrlPt1(1,2);
+originLocalx6 = rigtCtrlPt2(1,1); originLocaly6 = rigtCtrlPt2(1,2);
+originLocalx7 = rigtCtrlPt3(1,1); originLocaly7 = rigtCtrlPt3(1,2);
+originLocalx8 = rigtCtrlPt4(1,1); originLocaly8 = rigtCtrlPt4(1,2);
+
+targetLocalx1 = middCtrlPt1(1,1); targetLocaly1 = middCtrlPt1(1,2);
+targetLocalx2 = middCtrlPt2(1,1); targetLocaly2 = middCtrlPt2(1,2);
+targetLocalx3 = middCtrlPt3(1,1); targetLocaly3 = middCtrlPt3(1,2);
+targetLocalx4 = middCtrlPt4(1,1); targetLocaly4 = middCtrlPt4(1,2);
+targetLocalx5 = middCtrlPt5(1,1); targetLocaly5 = middCtrlPt5(1,2);
+targetLocalx6 = middCtrlPt6(1,1); targetLocaly6 = middCtrlPt6(1,2);
+targetLocalx7 = middCtrlPt7(1,1); targetLocaly7 = middCtrlPt7(1,2);
+targetLocalx8 = middCtrlPt8(1,1); targetLocaly8 = middCtrlPt8(1,2);
+%{
+im2(round(middCtrlPt5(2)), round(middCtrlPt5(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt5(2))-1, round(middCtrlPt5(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt5(2)), round(middCtrlPt5(1))-1, :) = [255, 0, 0];
+im2(round(middCtrlPt5(2))+1, round(middCtrlPt5(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt5(2)), round(middCtrlPt5(1))+1, :) = [255, 0, 0];
+
+im2(round(middCtrlPt6(2)), round(middCtrlPt6(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt6(2))-1, round(middCtrlPt6(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt6(2)), round(middCtrlPt6(1))-1, :) = [255, 0, 0];
+im2(round(middCtrlPt6(2))+1, round(middCtrlPt6(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt6(2)), round(middCtrlPt6(1))+1, :) = [255, 0, 0];
+
+im2(round(middCtrlPt7(2)), round(middCtrlPt7(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt7(2))-1, round(middCtrlPt7(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt7(2)), round(middCtrlPt7(1))-1, :) = [255, 0, 0];
+im2(round(middCtrlPt7(2))+1, round(middCtrlPt7(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt7(2)), round(middCtrlPt7(1))+1, :) = [255, 0, 0];
+
+im2(round(middCtrlPt8(2)), round(middCtrlPt8(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt8(2))-1, round(middCtrlPt8(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt8(2)), round(middCtrlPt8(1))-1, :) = [255, 0, 0];
+im2(round(middCtrlPt8(2))+1, round(middCtrlPt8(1)), :) = [255, 0, 0];
+im2(round(middCtrlPt8(2)), round(middCtrlPt8(1))+1, :) = [255, 0, 0];
+
+%imshow(im2);
+%}
+
+%Ceate Canvas
+canvas = uint8(zeros(2000, 2000, 3));
+
+%Copy the Imges onto Canvas
+for i = 1:720
+    for j = 1:480
+        canvas(i+640, j, :) = im1(i, j, :);
+        canvas(i+640, j+760, :) = im2(i, j, :);
+        canvas(i+640, j+1520, :) = im3(i, j, :);
+    end
+end
+
+%Get the Canvas Coordinates
+originCanvasx1 = originLocalx1; originCanvasy1 = originLocaly1 + 640;
+originCanvasx2 = originLocalx2; originCanvasy2 = originLocaly2 + 640;
+originCanvasx3 = originLocalx3; originCanvasy3 = originLocaly3 + 640;
+originCanvasx4 = originLocalx4; originCanvasy4 = originLocaly4 + 640;
+originCanvasx5 = originLocalx5 + 1520; originCanvasy5 = originLocaly5 + 640;
+originCanvasx6 = originLocalx6 + 1520; originCanvasy6 = originLocaly6 + 640;
+originCanvasx7 = originLocalx7 + 1520; originCanvasy7 = originLocaly7 + 640;
+originCanvasx8 = originLocalx8 + 1520; originCanvasy8 = originLocaly8 + 640;
+
+targetCanvasx1 = targetLocalx1 + 760; targetCanvasy1 = targetLocaly1 + 640;
+targetCanvasx2 = targetLocalx2 + 760; targetCanvasy2 = targetLocaly2 + 640;
+targetCanvasx3 = targetLocalx3 + 760; targetCanvasy3 = targetLocaly3 + 640;
+targetCanvasx4 = targetLocalx4 + 760; targetCanvasy4 = targetLocaly4 + 640;
+targetCanvasx5 = targetLocalx5 + 760; targetCanvasy5 = targetLocaly5 + 640;
+targetCanvasx6 = targetLocalx6 + 760; targetCanvasy6 = targetLocaly6 + 640;
+targetCanvasx7 = targetLocalx7 + 760; targetCanvasy7 = targetLocaly7 + 640;
+targetCanvasx8 = targetLocalx8 + 760; targetCanvasy8 = targetLocaly8 + 640;
+%}
+
+%Get the Cartisian Coordinates
+%{
+originCartisianx1 = originCanvasx1; originCartisiany1 = 2000 - originCanvasy1;
+originCartisianx2 = originCanvasx2; originCartisiany2 = 2000 - originCanvasy2;
+originCartisianx3 = originCanvasx3; originCartisiany3 = 2000 - originCanvasy3;
+originCartisianx4 = originCanvasx4; originCartisiany4 = 2000 - originCanvasy4;
+
+targetCartisianx1 = targetCanvasx1; targetCartisiany1 = 2000 - targetCanvasy1; 
+targetCartisianx2 = targetCanvasx2; targetCartisiany2 = 2000 - targetCanvasy2;
+targetCartisianx3 = targetCanvasx3; targetCartisiany3 = 2000 - targetCanvasy3; 
+targetCartisianx4 = targetCanvasx4; targetCartisiany4 = 2000 - targetCanvasy4;
+%}
+
+%Show the Control Points in Canvas
+%{
+canvas(round(originCanvasy1), round(originCanvasx1), :) = [255, 0, 0];
+canvas(round(originCanvasy2), round(originCanvasx2), :) = [255, 0, 0];
+canvas(round(originCanvasy3), round(originCanvasx3), :) = [255, 0, 0];
+canvas(round(originCanvasy4), round(originCanvasx4), :) = [255, 0, 0];
+canvas(round(originCanvasy5), round(originCanvasx5), :) = [255, 0, 0];
+canvas(round(originCanvasy6), round(originCanvasx6), :) = [255, 0, 0];
+canvas(round(originCanvasy7), round(originCanvasx7), :) = [255, 0, 0];
+canvas(round(originCanvasy8), round(originCanvasx8), :) = [255, 0, 0];
+canvas(round(targetCanvasy1), round(targetCanvasx1), :) = [255, 0, 0];
+canvas(round(targetCanvasy2), round(targetCanvasx2), :) = [255, 0, 0];
+canvas(round(targetCanvasy3), round(targetCanvasx3), :) = [255, 0, 0];
+canvas(round(targetCanvasy4), round(targetCanvasx4), :) = [255, 0, 0];
+canvas(round(targetCanvasy5), round(targetCanvasx5), :) = [255, 0, 0];
+canvas(round(targetCanvasy6), round(targetCanvasx6), :) = [255, 0, 0];
+canvas(round(targetCanvasy7), round(targetCanvasx7), :) = [255, 0, 0];
+canvas(round(targetCanvasy8), round(targetCanvasx8), :) = [255, 0, 0];
+%}
+
+%imshow(canvas);
+
+%Construct the Matrix
+%Left Matrix
+originCtrlPt1 = [originCanvasx1, originCanvasy1, 1, 0, 0, 0, -originCanvasx1*targetCanvasx1, -originCanvasy1*targetCanvasx1; 
+                 0, 0, 0, originCanvasx1, originCanvasy1, 1, -originCanvasx1*targetCanvasy1, -originCanvasy1*targetCanvasy1];
+originCtrlPt2 = [originCanvasx2, originCanvasy2, 1, 0, 0, 0, -originCanvasx2*targetCanvasx2, -originCanvasy2*targetCanvasx2; 
+                 0, 0, 0, originCanvasx2, originCanvasy2, 1, -originCanvasx2*targetCanvasy2, -originCanvasy2*targetCanvasy2];
+originCtrlPt3 = [originCanvasx3, originCanvasy3, 1, 0, 0, 0, -originCanvasx3*targetCanvasx3, -originCanvasy3*targetCanvasx3; 
+                 0, 0, 0, originCanvasx3, originCanvasy3, 1, -originCanvasx3*targetCanvasy3, -originCanvasy3*targetCanvasy3];
+originCtrlPt4 = [originCanvasx4, originCanvasy4, 1, 0, 0, 0, -originCanvasx4*targetCanvasx4, -originCanvasy4*targetCanvasx4; 
+                 0, 0, 0, originCanvasx4, originCanvasy4, 1, -originCanvasx4*targetCanvasy4, -originCanvasy4*targetCanvasy4];
+%Right Matrix
+originCtrlPt5 = [originCanvasx5, originCanvasy5, 1, 0, 0, 0, -originCanvasx5*targetCanvasx5, -originCanvasy5*targetCanvasx5; 
+                 0, 0, 0, originCanvasx5, originCanvasy5, 1, -originCanvasx5*targetCanvasy5, -originCanvasy5*targetCanvasy5];
+originCtrlPt6 = [originCanvasx6, originCanvasy6, 1, 0, 0, 0, -originCanvasx6*targetCanvasx6, -originCanvasy6*targetCanvasx6; 
+                 0, 0, 0, originCanvasx6, originCanvasy6, 1, -originCanvasx6*targetCanvasy6, -originCanvasy6*targetCanvasy6];
+originCtrlPt7 = [originCanvasx7, originCanvasy7, 1, 0, 0, 0, -originCanvasx7*targetCanvasx7, -originCanvasy7*targetCanvasx7; 
+                 0, 0, 0, originCanvasx7, originCanvasy7, 1, -originCanvasx7*targetCanvasy7, -originCanvasy7*targetCanvasy7];
+originCtrlPt8 = [originCanvasx8, originCanvasy8, 1, 0, 0, 0, -originCanvasx8*targetCanvasx8, -originCanvasy8*targetCanvasx8; 
+                 0, 0, 0, originCanvasx8, originCanvasy8, 1, -originCanvasx8*targetCanvasy8, -originCanvasy8*targetCanvasy8];
+%Middle Matrix
+targetCtrlPt1 = [targetCanvasx1; targetCanvasy1];
+targetCtrlPt2 = [targetCanvasx2; targetCanvasy2];
+targetCtrlPt3 = [targetCanvasx3; targetCanvasy3];
+targetCtrlPt4 = [targetCanvasx4; targetCanvasy4];
+targetCtrlPt5 = [targetCanvasx5; targetCanvasy5];
+targetCtrlPt6 = [targetCanvasx6; targetCanvasy6];
+targetCtrlPt7 = [targetCanvasx7; targetCanvasy7];
+targetCtrlPt8 = [targetCanvasx8; targetCanvasy8];
+
+%Construct Matrix
+leftOriginMatrix = double([originCtrlPt1; originCtrlPt2; originCtrlPt3; originCtrlPt4]);
+rigtOriginMatrix = double([originCtrlPt5; originCtrlPt6; originCtrlPt7; originCtrlPt8]);
+targetMatrix1 = double([targetCtrlPt1; targetCtrlPt2; targetCtrlPt3; targetCtrlPt4]);
+targetMatrix2 = double([targetCtrlPt5; targetCtrlPt6; targetCtrlPt7; targetCtrlPt8]);
+
+%Compute the Transform Matrix
+transformMatrix1 = double(reshape([leftOriginMatrix \ targetMatrix1; 1], [3,3]))';
+transformMatrix2 = double(reshape([rigtOriginMatrix \ targetMatrix2; 1], [3,3]))';
+
+Result = uint8(zeros(2000, 2000, 3));
+
+%Get the four Corners of Left Image
+leftupp1 = transformMatrix1 * [1; 641; 1];
+leftdwn1 = transformMatrix1 * [1; 1360; 1];
+rightup1 = transformMatrix1 * [480; 641; 1];
+rightdw1 = transformMatrix1 * [480; 1360; 1];
+leftuppx1 = round(abs(leftupp1(1) / leftupp1(3)));
+leftuppy1 = round(abs(leftupp1(2) / leftupp1(3)));
+leftdwnx1 = round(abs(leftdwn1(1) / leftdwn1(3)));
+leftdwny1 = round(abs(leftdwn1(2) / leftdwn1(3)));
+rightupx1 = round(abs(rightup1(1) / rightup1(3)));
+rightupy1 = round(abs(rightup1(2) / rightup1(3)));
+rightdwx1 = round(abs(rightdw1(1) / rightdw1(3)));
+rightdwy1 = round(abs(rightdw1(2) / rightdw1(3)));
+%Get the four Corners of Right Image
+leftupp2 = transformMatrix2 * [1521; 641; 1];
+leftdwn2 = transformMatrix2 * [1521; 1360; 1];
+rightup2 = transformMatrix2 * [2000; 641; 1];
+rightdw2 = transformMatrix2 * [2000; 1360; 1];
+leftuppx2 = round(abs(leftupp2(1) / leftupp2(3)));
+leftuppy2 = round(abs(leftupp2(2) / leftupp2(3)));
+leftdwnx2 = round(abs(leftdwn2(1) / leftdwn2(3)));
+leftdwny2 = round(abs(leftdwn2(2) / leftdwn2(3)));
+rightupx2 = round(abs(rightup2(1) / rightup2(3)));
+rightupy2 = round(abs(rightup2(2) / rightup2(3)));
+rightdwx2 = round(abs(rightdw2(1) / rightdw2(3)));
+rightdwy2 = round(abs(rightdw2(2) / rightdw2(3)));
+
+%Inverse Mapping Left Image
+for i = leftuppy1:leftdwny1 + 10
+    for j = leftuppx1:rightdwx1
+        newpos = transformMatrix1 \ [j; i; 1];
+        newi = round(abs(newpos(2) / newpos(3)));
+        newj = round(abs(newpos(1) / newpos(3)));
+        if (newi < 1), newi = 1; end
+        if (newj < 1), newj = 1; end
+        Result(i, j, :) = canvas(newi, newj, :);
+    end
+end
+
+
+%Inverse Mapping Right Image
+for i = rightupy2:rightdwy2
+    for j = leftuppx2:rightdwx2
+        newpos = transformMatrix2 \ [j; i; 1];
+        newi = round(abs(newpos(2) / newpos(3)));
+        newj = round(abs(newpos(1) / newpos(3)));
+        if (newi < 1), newi = 1; end
+        if (newj < 1), newj = 1; end
+        Result(i, j, :) = canvas(newi, newj, :);
+    end
+end
+
+%The Middle Image Averaging
+
+
+for i = 641:1360
+    for j = 761:1240
+        if (Result(i, j, 1) == 0 && Result(i, j, 2) == 0 && Result(i, j, 3) == 0)
+            Result(i, j, :) = canvas(i, j, :);
+        else
+            Result(i, j, :) = uint8((canvas(i, j, :) + Result(i, j, :)) / 2);
+        end
+    end
+end
+
+
+
+%The middle Image Paste
+%{
+for i = 641:1360
+    for j = 761:1240
+        Result(i, j, :) = canvas(i, j, :);
+    end
+end
+%}
+imshow(Result);
+imwrite(Result,'average.jpg');
+
+%Read Raw Image Function
+function I = readraw(filename, height, width, bpp)
+    disp(['Reading Image ' filename ' ... ']);
+    %Check File ID Exists or Not
+    id = fopen(filename, 'rb');
+    if (id == -1)
+        disp('The File Dose Not Exist. Press CTRL-C.');
+        pause;  
+    end
+    
+    %Get the Image Data From the File
+    pixels = fread(id, inf, 'uchar');
+    
+    %Close File
+    fclose(id);
+    
+    %Initialize the Matrix
+    I = zeros(height, width, bpp);
+    
+    %Construct the Image Matrix
+    for i = 1 : height
+        for j = 1 : width
+            for k = 1 : bpp
+                I(i, j, k) = pixels((width * (i - 1) + (j - 1)) * bpp + k);
+            end
+        end
+    end
+    I = uint8(I);
+end
+
+%(1) Name : Zhiwei Deng
+%(2) USC ID Number : 3669230452
+%(3) USC Email : zhiweide@usc.edu
+%(4) Submission Date : 03/03/2020
+
+%Warping
+function warp_img = warp(im)
+    warp_img = uint8(zeros(512, 512, 3));
+    %Warping
+    for i = 1:512
+        for j = 1:512
+            %Get the Region and Transformed Coordinate
+            region = getRegion(i, j);
+            %Check the Distance of the Pixels
+            dist = getDistance(i, j, region);
+            if (dist > 256)
+                continue;
+            end
+            [x, y] = getCoord(region, i, j);
+            %Compute the Angle Cosine and Sine
+            c_theta = x / dist;
+            s_theta = y / dist;
+            %Compute the New Locations
+            [new_x, new_y] = computeLocation(c_theta, s_theta, x, y, region);
+            %Do the Bilinear Interpolation
+            value = bilinear(new_x, new_y, region, im);
+            %value = im(round(new_y), round(new_x), :);
+            warp_img(j,i,:) = value;
+        end
+    end
+end
+
+%Get the Region of the Pixels
+function region = getRegion(i, j)
+    %Cross Lines
+    if (i == 256 || j == 256), region = 0; end
+    %Left Upper Corner
+    if (i < 256 && j < 256), region = 1; end
+    %Right Upper Corner
+    if (i < 256 && j > 256), region = 2; end
+    %Left Down Corner
+    if (i > 256 && j < 256), region = 3; end
+    %Right Down Corner
+    if (i > 256 && j > 256), region = 4; end
+    return;
+end
+
+%Get the Coordinates
+function [x, y] = getCoord(region, i, j)
+    %Cross Lines
+    if (region == 0)
+        x = i;
+        y = j;
+    end
+    %Left Upper Corner
+    if (region == 1)
+        x = 256 - i;
+        y = 256 - j;
+    end
+    %Right Upper Corner
+    if (region == 2)
+        x = 256 - i;
+        y = j - 256;
+    end
+    %Left Down Corner
+    if (region == 3)
+        x = i - 256;
+        y = 256 - j;
+    end
+    %Right Down Corner
+    if (region == 4)
+        x = i - 256;
+        y = j - 256;
+    end
+    return;
+end
+
+%Get the New Location
+function [new_x, new_y] = computeLocation(c_theta, s_theta, x, y, region)
+    if (c_theta > sqrt(2)/2)
+        total = 256 / c_theta;
+        new_x = x * total / 256;
+        new_y = y * total / 256;
+    else
+        total = 256 / s_theta;
+        new_x = x * total / 256;
+        new_y = y * total / 256;
+    end
+    %Get the Original Coordinate
+    %Left Upper
+    if (region == 0)
+        new_x = x;
+        new_y = y;
+    end
+    if (region == 1)
+        new_x = 256 - new_x;
+        new_y = 256 - new_y;
+    end
+    %Right Upper
+    if (region == 2)
+        new_x = 256 - new_x;
+        new_y = new_y + 256;
+    end
+    %Left Down
+    if (region == 3)
+        new_x = new_x + 256;
+        new_y = 256 - new_y;
+    end
+    %Right Down
+    if (region == 4)
+        new_x = new_x + 256;
+        new_y = new_y + 256;
+    end
+    %Bound
+    if (new_x < 1), new_x = 1; end
+    if (new_y < 1), new_y = 1; end
+    if (new_x > 512), new_x = 512; end
+    if (new_y > 512), new_y = 512; end
+end
+
+%Blinear Interpolation
+function value = bilinear(src_x, src_y, region, im)
+    if (region == 0)
+        value = im(src_y, src_x, :);
+        return;
+    end
+    floor_x = floor(src_x);
+	floor_y = floor(src_y);
+	top_x = min(floor_x + 1, 512);
+	top_y = min(floor_y + 1, 512);
+    value0 = (top_x - src_x) * im(floor_y, floor_x, :) + (src_x - floor_x) * im(floor_y, top_x, :);
+	value1 = (top_x - src_x) * im(top_y, floor_x, :) + (src_x - floor_x) * im(top_y, top_x, :);
+    value = int64((top_y - src_y) * value0 + (src_y - floor_y) * value1);
+end
+
+%Distance Function
+function dist = getDistance(i, j, region)
+    if (region == 0)
+        dist = 0;
+    end
+    if (region == 1)
+        dist = sqrt((i-256)^2+(j-256)^2);
+    end
+    if (region == 2)
+        dist = sqrt((i-256)^2+(j-256)^2);
+    end
+    if (region == 3)
+        dist = sqrt((i-256)^2+(j-256)^2);
+    end
+    if (region == 4)
+        dist = sqrt((i-256)^2+(j-256)^2);
+    end
+end
+
+
+%(1) Name : Zhiwei Deng
+%(2) USC ID Number : 3669230452
+%(3) USC Email : zhiweide@usc.edu
+%(4) Submission Date : 03/03/2020
+
+bb8 = readraw('Images/bb8.raw', 512, 512, 3);
+hedwig = readraw('Images/hedwig.raw', 512, 512, 3);
+raccoon = readraw('Images/raccoon.raw', 512, 512, 3);
+
+warp_img0 = warp(bb8);
+rcvr_img0 = inverse(warp_img0);
+warp_img1 = warp(hedwig);
+rcvr_img1 = inverse(warp_img1);
+warp_img2 = warp(raccoon);
+rcvr_img2 = inverse(warp_img2);
+
+%imshow(warp_img);
+imwrite(warp_img0,'bb8warpr.jpg');
+imwrite(warp_img1,'hedwigwarpr.jpg');
+imwrite(warp_img2,'raccoonwarpr.jpg');
+imwrite(rcvr_img0,'bb8rcvr.jpg');
+imwrite(rcvr_img1,'hedwigrcvr.jpg');
+imwrite(rcvr_img2,'raccoonrcvr.jpg');
+
+%Read Raw Image Function
+function I = readraw(filename, height, width, bpp)
+    disp(['Reading Image ' filename ' ... ']);
+    %Check File ID Exists or Not
+    id = fopen(filename, 'rb');
+    if (id == -1)
+        disp('The File Dose Not Exist. Press CTRL-C.');
+        pause;  
+    end
+    
+    %Get the Image Data From the File
+    pixels = fread(id, inf, 'uchar');
+    
+    %Close File
+    fclose(id);
+    
+    %Initialize the Matrix
+    I = zeros(height, width, bpp);
+    
+    %Construct the Image Matrix
+    for i = 1 : height
+        for j = 1 : width
+            for k = 1 : bpp
+                I(i, j, k) = pixels((width * (i - 1) + (j - 1)) * bpp + k);
+            end
+        end
+    end
+    I = uint8(I);
+end
+
+
+#include <fstream>
+#include <iostream>
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <vector>
+#include <algorithm>
+#include <iomanip>
+#include "image.h"
+
+#define _USE_MATH_DEFINES
+
+using namespace std;
+
+//Conditional Mask Matrix of Shrinking
+const unsigned char CMP_S[58] = 
+{
+	//S1
+	32, 128, 4, 1,
+	//S2
+	8, 64, 16, 2,
+	//S3
+	40, 96, 192, 144, 20, 6, 3, 9,
+	//STK1
+	41, 224, 148, 7,
+	//ST1
+	200, 73, 112, 42,
+	//ST2
+	104, 208, 22, 11,
+	//ST3
+	201, 116,
+	//STK2
+	232, 105, 240, 212, 150, 23, 15, 43,
+	//STK3
+	233, 244, 151, 47,
+	//STK4
+	107, 248, 214, 31,
+	//STK5
+	235, 111, 252, 249, 246, 215, 159, 63,
+	//STK6
+	239, 253, 247, 191
+};
+
+//Conditional Mask Matrix of Thinning
+const unsigned char CMP_T[46] = 
+{
+	//TK
+	72, 80, 18, 10,
+	//STK1
+	41, 224, 148, 7,
+	//ST1
+	200, 73, 112, 42,
+	//ST2
+	104, 208, 22, 11,
+	//ST3
+	201, 116,
+	//STK2
+	232, 105, 240, 212, 150, 23, 15, 43,
+	//STK3
+	233, 244, 151, 47,
+	//STK4
+	107, 248, 214, 31,
+	//STK5
+	235, 111, 252, 249, 246, 215, 159, 63,
+	//STK6
+	239, 253, 247, 191
+};
+
+const unsigned char CMP_K[40] = 
+{
+	//TK
+	72, 80, 18, 10,
+	//STK1
+	41, 224, 148, 7,
+	//STK2
+	232, 105, 240, 212, 150, 23, 15, 43,
+	//STK3
+	233, 244, 151, 47,
+	//STK4
+	107, 248, 214, 31,
+	//STK5
+	235, 111, 252, 249, 246, 215, 159, 63,
+	//STK6
+	239, 253, 247, 191,
+	//K
+	251, 254, 223, 127
+};
+
+
+//Unconditional Mask Matrix Shrinking Thinning
+const unsigned char UMP_ST[332] = 
+{
+	//Spur
+	32, 128,
+	//Single 4-connection
+	2, 8,
+	//L Cluster
+	40, 96, 192, 144, 20, 6, 3, 9,
+	//4-connected Offset
+	112, 200, 73, 42,
+	//Spur Corner Cluster
+	44, 100, 108, 
+	145, 193, 209, 
+	38, 52, 54, 
+	137, 131, 139,
+	//Corner Cluster
+	208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 
+	240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+	//11,  15,  27,  31,  43,  47,  59,  63,  75,  79,  91,  95,  107, 111, 123, 127, 
+	//139, 143, 155, 159, 171, 175, 187, 191, 203, 207, 219, 223, 235, 239, 251, 255,
+	//Tee Branch
+	88, 92, 216, 220, 
+	88, 89, 120, 121, 
+	26, 27, 58, 59,
+	26, 30, 154, 158,
+	82, 114, 210, 242,
+	82, 83, 86, 87, 
+	74, 75, 78, 79, 
+	74, 106, 202, 234,
+	//Vee Branch
+	161, 162, 163, 164, 165, 166, 167, 169, 170, 171, 172, 173, 174, 175, 177, 178,
+	179, 180, 181, 182, 183, 185, 186, 187, 188, 189, 190, 191, 
+	225, 226, 227, 228, 229, 230, 231, 233, 234, 235, 236, 237, 238, 239, 241, 242, 
+	243, 244, 245, 246, 247, 249, 250, 251, 252, 253, 254, 255, 
+
+	133, 140, 141, 164, 165, 172, 173, 135, 142, 143, 166, 167, 174, 175, 149, 156, 
+	157, 180, 181, 188, 189, 151, 158, 159, 182, 183, 190, 191, 
+	197, 204, 205, 228, 229, 236, 237, 199, 206, 207, 230, 231, 238, 239, 213, 220, 
+	221, 244, 245, 252, 253, 215, 222, 223, 246, 247, 254, 255,
+
+	37,  39,  45,  47,  53,  55,  61,  63,  69,  71,  77,  79,  85,  87,  93,  95, 
+	101, 103, 109, 111, 117, 119, 125, 127, 133, 135, 141, 143, 
+	149, 151, 157, 159, 165, 167, 173, 175, 181, 183, 189, 191, 197, 199, 205, 207, 
+	213, 215, 221, 223, 229, 231, 237, 239, 245, 247, 253, 255,
+
+	37,  39,  45,  47,  49,  51,  53,  55,  57,  59,  61,  63,  101, 103, 109, 111, 
+	113, 115, 117, 119, 121, 123, 125, 127, 161, 163, 165, 167, 
+	169, 171, 173, 175, 177, 179, 181, 183, 185, 187, 189, 191, 225, 227, 229, 231, 
+	233, 235, 237, 239, 241, 243, 245, 247, 249, 251, 253, 255,
+
+	//Diagonal Branch
+	76, 77, 204, 205, 
+	50, 51, 178, 179, 
+	81, 85, 113, 117, 
+	138, 142, 170, 174
+};
+
+//Unconditional Mask Matrix Skeleton
+const unsigned char UMP_SK[444] = 
+{
+	//Spur
+	1, 4, 32, 128,
+	//Single 4-connection
+	2, 8, 16, 64,
+	//L Corner
+	72, 80, 10, 18,
+	//Corner Cluster
+	208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 
+	240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+	11,  15,  27,  31,  43,  47,  59,  63,  75,  79,  91,  95,  107, 111, 123, 127, 
+	139, 143, 155, 159, 171, 175, 187, 191, 203, 207, 219, 223, 235, 239, 251, 255,
+	//Tee Branch
+	88,  89,  90,  91,  92,  93,  94,  95,  120, 121, 122, 123, 124, 125, 126, 127, 
+	216, 217, 218, 219, 220, 221, 222, 223, 248, 249, 250, 251, 252, 253, 254, 255,
+
+	82,  83,  86,  87,  90,  91,  94,  95,  114, 115, 118, 119, 122, 123, 126, 127, 
+	210, 211, 214, 215, 218, 219, 222, 223, 242, 243, 246, 247, 250, 251, 254, 255,
+
+	26,  27,  30,  31,  58,  59,  62,  63,  90,  91,  94,  95,  122, 123, 126, 127, 
+	154, 155, 158, 159, 186, 187, 190, 191, 218, 219, 222, 223, 250, 251, 254, 255,
+
+	74,  75,  78,  79,  90,  91,  94,  95,  106, 107, 110, 111, 122, 123, 126, 127, 
+	202, 203, 206, 207, 218, 219, 222, 223, 234, 235, 238, 239, 250, 251, 254, 255,
+	//Vee Branch
+	161, 162, 163, 164, 165, 166, 167, 169, 170, 171, 172, 173, 174, 175, 177, 178,
+	179, 180, 181, 182, 183, 185, 186, 187, 188, 189, 190, 191, 
+	225, 226, 227, 228, 229, 230, 231, 233, 234, 235, 236, 237, 238, 239, 241, 242, 
+	243, 244, 245, 246, 247, 249, 250, 251, 252, 253, 254, 255, 
+
+	133, 140, 141, 164, 165, 172, 173, 135, 142, 143, 166, 167, 174, 175, 149, 156, 
+	157, 180, 181, 188, 189, 151, 158, 159, 182, 183, 190, 191, 
+	197, 204, 205, 228, 229, 236, 237, 199, 206, 207, 230, 231, 238, 239, 213, 220, 
+	221, 244, 245, 252, 253, 215, 222, 223, 246, 247, 254, 255,
+
+	37,  39,  45,  47,  53,  55,  61,  63,  69,  71,  77,  79,  85,  87,  93,  95, 
+	101, 103, 109, 111, 117, 119, 125, 127, 133, 135, 141, 143, 
+	149, 151, 157, 159, 165, 167, 173, 175, 181, 183, 189, 191, 197, 199, 205, 207, 
+	213, 215, 221, 223, 229, 231, 237, 239, 245, 247, 253, 255,
+
+	37,  39,  45,  47,  49,  51,  53,  55,  57,  59,  61,  63,  101, 103, 109, 111, 
+	113, 115, 117, 119, 121, 123, 125, 127, 161, 163, 165, 167, 
+	169, 171, 173, 175, 177, 179, 181, 183, 185, 187, 189, 191, 225, 227, 229, 231, 
+	233, 235, 237, 239, 241, 243, 245, 247, 249, 251, 253, 255,
+	//Diagonal Branch
+	76, 77, 204, 205, 
+	50, 51, 178, 179, 
+	81, 85, 113, 117, 
+	138, 142, 170, 174
+};
+
+//Keep the Values Don't Overflow
+int bound(double value)
+{
+	value = value > 255 ? 255 : value;
+	value = value < 0 ? 0 : value;
+	return (int)value;
+}
+
+//Convolution
+double convolute(double filter[], unsigned char value[], int size)
+{
+	double sum = 0;
+	for (int i = 0; i < size; i++)
+		sum = sum + value[i] * filter[i];
+	return sum;
+}
+
+//Get the Mask Pattern
+unsigned char getMask(unsigned char value[])
+{
+	unsigned char temp = 0;
+	temp = temp + 128 * value[0];
+	temp = temp + 64 * value[1];
+	temp = temp + 32 * value[2];
+	temp = temp + 16* value[3];
+	temp = temp + 8 * value[5];
+	temp = temp + 4 * value[6];
+	temp = temp + 2 * value[7];
+	temp = temp + 1 * value[8];
+	return temp;
+}
+
+//Find Masks or Not
+bool compareMask(unsigned char mask, const unsigned char pattern[], int N)
+{
+	for (int i = 0; i < N; i++)
+		if (pattern[i] == mask)
+			return true;
+	return false;
+}
+
+//Get the Case for the Values
+unsigned char getCase(int values[])
+{
+	int status = 0;
+	int temp = 0;
+	//Case 1
+	for (int i = 0; i < 4; i++)
+		if (values[i] != 0)
+		{
+			status = 1;
+			temp = values[i];
+			break;
+		}
+	//Case 2
+	for (int i = 0; i < 4; i++)
+		if (values[i] != 0 && values[i] != temp)
+		{
+			status = 2;
+			break;
+		}
+	return status; 
+}
+
+//Union
+void unionFunc(int large, int small, int parent[])
+{
+	int i = large;
+    int j = small;
+    while (0 != parent[i])
+        i = parent[i];
+    while (0 != parent[j])
+        j = parent[j];
+    if (i != j)
+        parent[i] = j;
+}
+
+//Find the Corresponding Value
+int findRoot(int value, int parent[]) 
+{
+    int i = value;
+    while (0 != parent[i])
+        i = parent[i];
+    return i;
+}
+
+//Find Minimum Positive Number
+int min(int values[], int len)
+{
+	int mini = 10000;
+	for (int i = 0; i < len; i++)
+		if (values[i] != 0 && values[i] < mini)
+			mini = values[i];
+	return mini;
+}
+
+/*----------------------Member Functions------------------------*/
+/*------Accessory Functions-----*/
+//Constructor1
+Image::Image(int imgwidth, int imgheight, int imgbpp, char imgfileName[])
+{
+	width = imgwidth;
+	height = imgheight;
+	bpp = imgbpp;
+	fileName = imgfileName;
+	image1D = allocate_1D(width, height, bpp);
+	image3D = allocate_3D(width, height, bpp);
+}
+
+//Allocate 1D array
+unsigned char* Image::allocate_1D(int width, int height, int bpp)
+{
+	int pixCount = width * height * bpp;
+	unsigned char* Img = new unsigned char[pixCount]();
+	for (int i = 0; i < pixCount; i++)
+		Img[i] = 0;
+	return Img;
+}
+
+//Allocate 2D array
+unsigned char** Image::allocate_2D(int width, int height)
+{
+	unsigned char** Img = new unsigned char *[height]();
+	for (int i = 0; i < height; i++)
+	{
+		Img[i] = new unsigned char[width];
+		for (int j = 0; j < width; j++)
+			Img[i][j] = 0;
+	}
+	return Img;
+}
+
+//Allocate 3D array
+unsigned char*** Image::allocate_3D(int width, int height, int bpp)
+{
+	unsigned char*** Img = new unsigned char **[height]();
+	for (int i = 0; i < height; i++)
+	{
+		Img[i] = new unsigned char*[width]();
+		for (int j = 0; j < width; j++)
+		{
+			Img[i][j] = new unsigned char[bpp]();
+			for (int k = 0; k < bpp; k++)
+				Img[i][j][k] = 0;
+		}
+	}
+	return Img;
+}
+
+//Histogram Arrays Initialize
+int** Image::initHisto(int bpp)
+{
+	int** Histo = new int *[bpp]();
+	for (int i = 0; i < bpp; i++)
+	{
+		Histo[i] = new int[256];
+		for (int j = 0; j < 256; j++)
+			Histo[i][j] = 0;
+	}
+	return Histo;
+}
+
+//Get the Histogram of RGB Image
+void Image::imgHistoRGB(char type)
+{
+	char histoFile[50] = "Images/Histogram___.txt";
+	histoFile[17] = type;
+	for (int k = 0; k < bpp; k++)
+		for (int i = 0; i < height; i++)
+			for (int j = 0; j < width; j++)
+			{
+				int value = (int)image3D[i][j][k];
+				histo3D[k][value]++;
+			}
+	//Write Histogram data Into File
+	/*for (int i = 0; i < bpp; i++)
+	{
+		if (i == 0)
+			histoFile[18] = 'R';
+		else if(i == 1)
+			histoFile[18] = 'G';
+		else
+			histoFile[18] = 'B';
+		FILE* HistoFile = fopen(histoFile, "wb");
+		for (int j = 0; j < 256; j++)
+			fprintf(HistoFile, "%d ", histo3D[i][j]);
+		fclose(HistoFile);
+	}*/
+	cout << "Histogram File Write Successfully." << endl;
+}
+
+//Initializer
+void Image::initialize()
+{
+	image1D = allocate_1D(width, height, bpp);
+	image3D = allocate_3D(width, height, bpp);
+	histo3D = initHisto(bpp);
+}
+
+//Read File Method
+void Image::readFile()
+{
+	FILE* file = fopen(fileName, "rb");
+	if (file == NULL)
+	{
+		cout << "File Open Failed." << endl;
+		return;
+	}
+	else
+		fread(image1D, sizeof(unsigned char), width*height*bpp, file);
+	fclose(file);
+	getImage3D();
+	cout << "File Read Successfully." << endl;
+}
+
+//Write File Method
+void Image::writeFile()
+{
+   	FILE* out_file = fopen(fileName, "wb");
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+			for (int k = 0; k < bpp; k++)
+				fprintf(out_file, "%c", image3D[i][j][k]);
+	cout << "File Write Successfully." << endl;
+	fclose(out_file);
+}
+
+//Get 3D Image from 1D Image
+void Image::getImage3D()
+{
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+			for (int k = 0; k < bpp; k++)
+			{
+				int temp = (i * width + j) * bpp + k;
+				image3D[i][j][k] = image1D[temp];
+			}
+	//cout << "Get 3D Image Completed." << endl;
+}
+
+//Get 1D Image from 3D Image
+void Image::getImage1D()
+{
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+			for (int k = 0; k < bpp; k++)
+			{
+				int temp = (i * width + j) * bpp + k;
+				image1D[temp] = image3D[i][j][k];
+			}
+}
+
+//Extend the Image Boundary by Reflection
+int Image::imgPadding(int N)
+{
+	if (!(N % 2))
+	{
+		cout << "The Window Size Cannot Be Even." << endl;
+		return -1;
+	}
+	//Define the Padding width
+	int pad_width = (N-1) / 2;
+
+	//Initialize the Array for Storing the Image
+	image3D_Extended = allocate_3D(width + 2 * pad_width, height + 2 * pad_width, bpp);
+
+	//Store the 3D Image Data into it
+	for (int i = 0; i < height + 2 * pad_width; i++)
+		for (int j = 0; j < width + 2 * pad_width; j++)
+			for (int k = 0; k < bpp; k++)
+			{
+				//Upper Boundary and Corners
+				if (i < pad_width)
+				{
+					//Upper-Left Corner
+					if (j < pad_width)
+						image3D_Extended[i][j][k] = image3D[pad_width-1-i][pad_width-1-j][k];
+					//Upper Boundary
+					else if (j < width + pad_width)
+						image3D_Extended[i][j][k] = image3D[pad_width-1-i][j-pad_width][k];
+					//Upper-Right Corner
+					else
+						image3D_Extended[i][j][k] = image3D[pad_width-1-i][2*width+pad_width-j-1][k];
+				}
+				//Left and Right Boundary 
+				else if (i < height + pad_width)
+				{
+					//Left Boundary
+					if (j < pad_width)
+						image3D_Extended[i][j][k] = image3D[i-pad_width][pad_width-1-j][k];
+					//Image Data
+					else if (j < width + pad_width)
+						image3D_Extended[i][j][k] = image3D[i-pad_width][j-pad_width][k];
+					//Right Boundary
+					else
+						image3D_Extended[i][j][k] = image3D[i-pad_width][2*width+pad_width-j-1][k];
+				}
+				//Lower Boundary and Corners
+				else
+				{
+					//Lower-Left Corner
+					if (j < pad_width)
+						image3D_Extended[i][j][k] = image3D[2*height+pad_width-i-1][pad_width-1-j][k];
+					//Lower Boundary
+					else if (j < width + pad_width)
+						image3D_Extended[i][j][k] = image3D[2*height+pad_width-i-1][j-pad_width][k];
+					//Lower-Right Corner
+					else
+						image3D_Extended[i][j][k] = image3D_Extended[i][2*width+2*pad_width-j-1][k];
+				}
+			}
+	//Write into File to Verify the Algorithm is Working
+	/*	
+	FILE* ExtendedFile = fopen("Images/image3D_Extended.raw", "wb");
+	for (int i = 0; i < height + 2 * pad_width; i++)
+		for (int j = 0; j < width + 2 * pad_width; j++)
+			for (int k = 0; k < bpp; k++)
+				fprintf(ExtendedFile, "%c", image3D_Extended[i][j][k]);
+	fclose(ExtendedFile);
+	*/
+	cout << "Image Extended Successfully." << endl;
+	return pad_width;
+}
+
+//Compare Images Same or Not
+bool Image::compareImage(Image other)
+{
+	for (int k = 0; k < bpp; k++)
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+				if (other.image3D[i][j][k] != image3D[i][j][k])
+					return false;
+	return true;	
+}
+
+//Extend the Image Boundary by Reflection
+int Image::zeroPadding(int N)
+{
+	if (!(N % 2))
+	{
+		cout << "The Window Size Cannot Be Even." << endl;
+		return -1;
+	}
+	//Define the Padding width
+	int pad_width = (N-1) / 2;
+
+	//Initialize the Array for Storing the Image
+	image3D_Extended = allocate_3D(width + 2 * pad_width, height + 2 * pad_width, bpp);
+
+	//Store the 3D Image Data into it
+	for (int i = 0; i < height + 2 * pad_width; i++)
+		for (int j = 0; j < width + 2 * pad_width; j++)
+			for (int k = 0; k < bpp; k++)
+			{
+				//Image Data
+				if (i >= pad_width && i < height + pad_width && j >= pad_width && j < width + pad_width)
+					image3D_Extended[i][j][k] = image3D[i-pad_width][j-pad_width][k];
+				else
+					image3D_Extended[i][j][k] = 0;
+			}
+	cout << "Image Zero Extended Successfully." << endl;
+	return pad_width;
+}
+
+//Image Shrinking Function
+void Image::imgShrink(Image MaskImage, Image result, int thresh)
+{
+	int N = 3;
+	int pad_width = 1;
+
+	//Copy the Data
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (image3D[i][j][0] > thresh)
+				image3D[i][j][0] = 255;
+			else
+				image3D[i][j][0] = 0;
+		}
+
+	//Start the Loop
+	bool finish = false;
+	int iter = 0;
+	while(!finish)
+	{
+		iter++;
+		//Loop Over --- Conditional
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+			{
+				//Construct Value Arrays
+				MaskImage.image3D[i][j][0] = 0;
+				int count = 0;
+				unsigned char values[N*N];
+				for (int m = -pad_width; m <= pad_width; m++)
+					for (int n = -pad_width; n <= pad_width; n++)
+					{
+						values[count] = image3D[i+m][j+n][0] / 255;
+						count++;
+					}
+				//Conditional
+				unsigned char mask = getMask(values);
+				bool hit1 = compareMask(mask, CMP_S, 58);
+				if (hit1)
+					MaskImage.image3D[i][j][0] = (image3D[i][j][0] && hit1);
+			}
+		//Loop Over --- Unconditional
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+			{
+				//Construct Value Arrays
+				int count = 0;
+				unsigned char values[N*N];
+				for (int m = -pad_width; m <= pad_width; m++)
+					for (int n = -pad_width; n <= pad_width; n++)
+					{
+						values[count] = MaskImage.image3D[i+m][j+n][0];
+						count++;
+					}
+				//Unconditional
+				unsigned char mask = getMask(values);
+				bool hit2 = compareMask(mask, UMP_ST, 332);
+				image3D[i][j][0] = (image3D[i][j][0] && (!MaskImage.image3D[i][j][0] || hit2)) * 255;
+			}
+		//Check Finish
+		finish = compareImage(result);
+		//Loop Result Stored Temp
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+				result.image3D[i][j][0] = image3D[i][j][0];
+	}
+	getImage3D();
+	cout << "Shrinking Completed. Iteration = " << iter << endl;
+}
+
+//Image Thinning Function
+void Image::imgThin(Image MaskImage, Image result, int thresh)
+{
+	getImage1D();
+	int N = 3;
+	int pad_width = 1;
+
+	//Copy the Data
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (image3D[i][j][0] > thresh)
+				image3D[i][j][0] = 255;
+			else
+				image3D[i][j][0] = 0;
+		}
+
+	//Start the Loop
+	bool finish = false;
+	int iter = 0;
+	while(!finish)
+	{
+		iter++;
+		//Loop Over --- Conditional
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+			{
+				//Construct Value Arrays
+				MaskImage.image3D[i][j][0] = 0;
+				int count = 0;
+				unsigned char values[N*N];
+				for (int m = -pad_width; m <= pad_width; m++)
+					for (int n = -pad_width; n <= pad_width; n++)
+					{
+						values[count] = image3D[i+m][j+n][0] / 255;
+						count++;
+					}
+				//Conditional
+				unsigned char mask = getMask(values);
+				bool hit1 = compareMask(mask, CMP_T, 46);
+				MaskImage.image3D[i][j][0] = (image3D[i][j][0] && hit1);
+			}
+		//Loop Over --- Unconditional
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+			{
+				//Construct Value Arrays
+				int count = 0;
+				unsigned char values[N*N];
+				for (int m = -pad_width; m <= pad_width; m++)
+					for (int n = -pad_width; n <= pad_width; n++)
+					{
+						values[count] = MaskImage.image3D[i+m][j+n][0];
+						count++;
+					}
+				//Unconditional
+				unsigned char mask = getMask(values);
+				bool hit2 = compareMask(mask, UMP_ST, 332);
+				image3D[i][j][0] = (image3D[i][j][0] && (!MaskImage.image3D[i][j][0] || hit2)) * 255;
+			}
+		//Check Finish
+		finish = compareImage(result);
+		//Loop Result Stored Temp
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+				result.image3D[i][j][0] = image3D[i][j][0];
+	}
+	getImage3D();
+	cout << "Thinning Completed. Iteration = " << iter << endl;
+}
+
+//Image Skeletonizing Function
+void Image::imgSkeleton(Image MaskImage, Image result, int thresh)
+{
+	int N = 3;
+	int pad_width = 1;
+
+	//Filter the Data
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (image3D[i][j][0] > thresh)
+				image3D[i][j][0] = 255;
+			else
+				image3D[i][j][0] = 0;
+		}
+
+	//Start the Loop
+	bool finish = false;
+	int iter = 0;
+	while(!finish)
+	{
+		iter++;
+		//Loop Over --- Conditional
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+			{
+				//Construct Value Arrays
+				MaskImage.image3D[i][j][0] = 0;
+				int count = 0;
+				unsigned char values[N*N];
+				for (int m = -pad_width; m <= pad_width; m++)
+					for (int n = -pad_width; n <= pad_width; n++)
+					{
+						values[count] = image3D[i+m][j+n][0] / 255;
+						count++;
+					}
+				//Conditional
+				unsigned char mask = getMask(values);
+				bool hit1 = compareMask(mask, CMP_K, 40);
+				if (hit1)
+					MaskImage.image3D[i][j][0] = (image3D[i][j][0] && hit1);
+			}
+		//Loop Over --- Unconditional
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+			{
+				//Construct Value Arrays
+				int count = 0;
+				unsigned char values[N*N];
+				for (int m = -pad_width; m <= pad_width; m++)
+					for (int n = -pad_width; n <= pad_width; n++)
+					{
+						values[count] = MaskImage.image3D[i+m][j+n][0];
+						count++;
+					}
+				//Unconditional
+				unsigned char mask = getMask(values);
+				bool hit2 = compareMask(mask, UMP_SK, 444);
+				image3D[i][j][0] = (image3D[i][j][0] && (!MaskImage.image3D[i][j][0] || hit2)) * 255;
+			}
+		//Check Finish
+		finish = compareImage(result);
+		//Loop Result Stored Temp
+		for (int i = 1; i < height - 1; i++)
+			for (int j = 1; j < width - 1; j++)
+				result.image3D[i][j][0] = image3D[i][j][0];
+	}
+	getImage3D();
+	cout << "Skeletonizing Completed. Iteration = " << iter << endl;
+}
+
+//Reverse Binary Image
+void Image::imgReverse(Image result, int thresh)
+{
+	//Filter the Data
+	for (int i = 2; i < height-2; i++)
+		for (int j = 2; j < width-2; j++)
+		{
+			if (image3D[i][j][0] > thresh)
+				result.image3D[i][j][0] = 0;
+			else
+				result.image3D[i][j][0] = 255;
+		}
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (i == 0 || i == height-1 || j == 0 || j == width-1)
+				result.image3D[i][j][0] = 0;
+		}
+	result.getImage1D();
+}
+
+//Connected Component Analysis
+void Image::imgConnect(Image result, int thresh, int minRegion, bool histflag)
+{
+	int tag = 0;
+	int parent[800] = {0};
+	int region[800] = {0};
+	int histog[800] = {0};
+	//Histogram File
+	char funcFile[50] = "Images/StarHistogram.txt";
+
+	int imagedata[height][width][1];
+	//Filter the Data
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (image3D[i][j][0] > thresh)
+				imagedata[i][j][0] = 1;
+			else
+				imagedata[i][j][0] = 0;
+		}
+	//First Scan
+	for (int i = 1; i < height - 1; i++)
+		for (int j = 1; j < width - 1; j++)
+		{
+			if (imagedata[i][j][0] == 0)
+				continue;
+			//Get the Previous Pixels
+			int values[4];
+			values[0] = imagedata[i-1][j-1][0];
+			values[1] = imagedata[i-1][j][0];
+			values[2] = imagedata[i-1][j+1][0];
+			values[3] = imagedata[i][j-1][0];
+			//Get the Minimum Tag
+			int mintag = min(values, 4);
+			//Three Cases
+			unsigned char status = getCase(values);
+			if (status == 0)
+				imagedata[i][j][0] = ++tag;
+			else if (status == 1)
+				imagedata[i][j][0] = mintag;
+			else
+			{
+				imagedata[i][j][0] = mintag;
+				for (int m = 0; m < 4; m++)
+					if (values[m] != 0)
+						unionFunc(values[m], mintag, parent);				
+			}
+		}
+	//Max Tag Number
+	int maxtag = tag;
+
+	//Count the Child Label
+	int num = 0;
+	for (int i = 0; i < 800; i++)
+		if (parent[i] != 0)
+			num++;
+
+	//Get the Merged Tag Numbers
+	tag = tag - num;
+
+	//Second Scan
+	for (int i = 1; i < height - 1; i++)
+		for (int j = 1; j < width - 1; j++)
+			if (imagedata[i][j][0] != 0)
+				imagedata[i][j][0] = findRoot(imagedata[i][j][0], parent);
+
+	//Get the Pixel Numbers of Each Region
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+			if (imagedata[i][j][0] != 0)
+				region[imagedata[i][j][0]]++;
+
+	//Filter too Small Pathways
+	for (int i = 0; i < maxtag; i++)
+		if (region[i] != 0 && region[i] < minRegion)
+			tag--;
+
+	//Get the Histogram
+	if (histflag)
+	{
+		//Get the Histgram Data
+		for (int i = 0; i < maxtag+1; i++)
+			if (region[i] != 0)
+				histog[region[i]]++;
+
+		//for (int i = 0; i < 300; i++)
+		//		cout << histog[i] << endl;
+
+		//Write the Histogram File
+		FILE* FuncFile = fopen(funcFile, "wb");
+		for (int j = 0; j < maxtag; j++)
+			fprintf(FuncFile, "%d ", histog[j]);
+		fclose(FuncFile);
+	}
+
+	//Write File into Result
+	for (int i = 1; i < height - 1; i++)
+		for (int j = 1; j < width - 1; j++)
+			result.image3D[i][j][0] = (unsigned char)imagedata[i][j][0];
+	
+	cout << "Counting Done." << endl;
+	cout << "The Number of Distinct Objects is " << tag << endl;
+}
+
+
+void Image::countPoints(Image original)
+{
+	int num = 0;
+	for (int i = 1; i < height - 1; i++)
+		for (int j = 1; j < width - 1; j++)
+		{
+			if (image3D[i][j][0] == 0 || original.image3D[i][j][0] == 0)
+				continue;
+			//Count Individual Pixels
+			int sum = 0;
+			for (int m = -1; m <= 1; m++)
+				for (int n = -1; n <= 1; n++)
+					sum += image3D[i+m][j+n][0];
+			//Surrounding Pixels are 0
+			if (sum == 255)
+				num++;
+		}
+	cout << "The Number of Holes is " << num << endl;
+}
+
+//Find the Center and Radius of Gear
+void Image::analyzeGear(Image original, Image reverse, Image miss, Image thin)
+{
+	int index = 0;
+	float x_center = 0.0;
+	float y_center = 0.0;
+	int radius = 0;
+	int first_y = 0;
+	int x_coords[4] = {0};
+	int y_coords[4] = {0};
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			//If the Black Pixels, Skip
+			if (image3D[i][j][0] == 0)
+				continue;
+			//Count Individual Pixels
+			int sum = 0;
+			for (int m = -1; m <= 1; m++)
+				for (int n = -1; n <= 1; n++)
+					sum += image3D[i+m][j+n][0];
+			//Surrounding Pixels are 0
+			if (sum == 255)
+			{
+				x_coords[index] = j;
+				y_coords[index] = i;
+				index++;
+			}
+		}
+	//Compute the Center
+	x_center = (x_coords[0] + x_coords[1] + x_coords[2] + x_coords[3]) / 4;
+	y_center = (y_coords[0] + y_coords[1] + y_coords[2] + y_coords[3]) / 4;
+
+	//Compute the Out Side Radius
+	bool found = false;
+	for (int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+			if (original.image3D[i][j][0] == 255)
+			{
+				first_y = i;
+				found = true;
+				break;
+			}
+		if (found)
+			break;
+	}
+	radius = y_center - first_y;
+
+	//Locate the teethes Position
+	thin.teethLocate(reverse, x_center, y_center, radius);
+
+	reverse.image3D[(int)y_center][(int)x_center][0] = 255;
+	original.findTeeth(miss, x_center, y_center, radius);
+
+	//Output On the Screen
+	cout << "The Center of the Gear is (" << x_center << "," << y_center << ")." << endl;
+	cout << "The Out Radius of the Gear is " << radius << "." << endl;
+}
+
+//Locate the Teeth
+void Image::teethLocate(Image result, double x_center, double y_center, double radius)
+{
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			double dist = sqrt((i-y_center) * (i-y_center) + (j-x_center) * (j-x_center));
+			if (image3D[i][j][0] == 0 || abs(dist - radius + 11) > 0.5)
+				continue;
+			cout << "The Teeth Location is (" << i << "," << j << ")" << endl;
+			result.image3D[i][j][0] = 255;
+			//Chek the Teeth Besides it Construct the Vector
+			int x = round((j - x_center) * 0.866 - (y_center - i) * 0.5 + x_center);
+			int y = round(y_center - (j - x_center) * 0.5 - (y_center - i) * 0.866);
+			if (result.image3D[x][y][0] == 255)
+			{
+				cout << "The Missing Teeth Location is (" << x << "," << y << ")" << endl;
+				result.image3D[x][y][0] = 0;
+			}
+		}
+	result.imgReverse(result, 128);
+}
+
+//Find the missing Teeth
+void Image::findTeeth(Image result, double x_center, double y_center, double radius)
+{
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+			result.image3D[i][j][0] = image3D[i][j][0];
+
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			double dist = sqrt((i-y_center) * (i-y_center) + (j-x_center) * (j-x_center));
+			double sin_angle = abs(i - y_center) / dist;
+			//Too far or not missing
+			if (dist > radius ||image3D[i][j][0] > 128 || dist < 90)
+				continue;
+			//If the pixel not in 0-5, 25-35, 55-65, 85-90 Ignore
+			if (!(sin_angle < 0.084 || (sin_angle > 0.44 && sin_angle < 0.56) || (sin_angle > 0.84 && sin_angle < 0.89) || sin_angle > 0.998))
+				continue;
+			result.image3D[i][j][0] = 0;
+		}
+}
+
+//Count Stars
+void Image::countStar(Image shrink)
+{
+	int x_coord[200] = {0};
+	int y_coord[200] = {0};
+	int star_count[200] = {0};
+	int histog[300] = {0};
+
+	//Filter the Data
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (image3D[i][j][0] > 128)
+				image3D[i][j][0] = 255;
+			else
+				image3D[i][j][0] = 0;
+		}
+	//Get the coordinates of Stars
+	int num = 0;
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (shrink.image3D[i][j][0] == 255)
+			{
+				x_coord[num] = i;
+				y_coord[num] = j;
+				num++;
+			}
+		}
+	cout << "The number of the stars is " << num << endl;
+	//Check which Star the pixel Belongs to
+	for (int i = 0; i < height; i++)
+		for (int j = 0; j < width; j++)
+		{
+			if (image3D[i][j][0] == 255)
+			{
+				int index = 0;
+				double mindist = 500;
+				for (int k = 0; k < num; k++)
+				{
+					double dist = sqrt((i-x_coord[k]) * (i-x_coord[k]) + (j-y_coord[k]) * (j-y_coord[k]));
+					if (dist < mindist)
+					{
+						mindist = dist;
+						index = k;
+					}
+				}
+				star_count[index]++;
+			}
+		}
+	//Get the Histgram Data
+	for (int i = 0; i < num; i++)
+		if (star_count[i] != 0)
+			histog[star_count[i]]++;
+
+	//for (int i = 0; i < 300; i++)
+	//		cout << histog[i] << endl;
+
+	char funcFile[50] = "Images/StarHistogram2.txt";
+	//Write the Histogram File
+	FILE* FuncFile = fopen(funcFile, "wb");
+	for (int j = 0; j < 300; j++)
+		fprintf(FuncFile, "%d ", histog[j]);
+	fclose(FuncFile);
+}
+
+class Image
+{
+	public:
+		//Image height
+		int height;
+		//Image width;
+		int width;
+		//Number of Bytes Per pixel
+		int bpp;
+		//The Histogram of Image
+		int** histo3D;
+		//The Image FileName
+		char* fileName;
+		//The Image 1D array
+		unsigned char* image1D;
+		//The Image 3D array
+		unsigned char*** image3D;
+		//The Boundary-Extended Image 3D array
+		unsigned char*** image3D_Extended;
+		//Constructor
+		Image(int imgwidth, int imgheight, int imgbpp, char *imgfileName);
+		//Read File Method
+		void readFile();
+		//Write File Method
+		void writeFile();
+		//Initializer
+		void initialize();
+		//Histogram Arrays Initialize
+		int** initHisto(int bpp);
+		//Get the Image's Hsitogram
+		void imgHistoRGB(char type);
+		//Allocate 1D array
+		unsigned char* allocate_1D(int width, int height, int bpp);
+		//Allocate 2D array
+		unsigned char** allocate_2D(int width, int height);
+		//Allocate 3D array
+		unsigned char*** allocate_3D(int width, int height, int bpp);
+		//Get 3D Image from 1D Image
+		void getImage3D();
+		//Get 1D Image from 3D Image
+		void getImage1D();
+		//Extend the Image Boundary by Reflection
+		int imgPadding(int N);
+		//Extend the Image Boundary by Zeros
+		int zeroPadding(int N);
+		//Compare Images
+		bool compareImage(Image other);
+		//Shrinking Image Method
+		void imgShrink(Image MaskImage, Image result, int thresh);
+		//Thinning Image Method
+		void imgThin(Image MaskImage, Image result, int thresh);
+		//Skeletonizing Image Method
+		void imgSkeleton(Image MaskImage, Image result, int thresh);
+		//Connected Component Analysis
+		void imgConnect(Image result, int thresh, int minRegion,bool histflag);
+		//Get the Inverse Binary Image
+		void imgReverse(Image result, int thresh);
+		//PCB Count Holes
+		void countPoints(Image original);
+		//Find the Center and Radius of Gear
+		void analyzeGear(Image original, Image reverse, Image miss, Image thin);
+		//Count Stars
+		void countStar(Image shrink);
+		//Locate the Teeth
+		void teethLocate(Image result, double x_center, double y_center, double radius);
+		//Find the missing Teeth
+		void findTeeth(Image result, double x_center, double y_center, double radius);
+};
+
+
+#include <iostream>
+#include "image.h"
+
+using namespace std;
+
+int main()
+{
+	//Define the Size the Gallery Image
+	int imageWidth = 558;
+	int imageHeight = 558;
+	int cupWidth = 315;
+	int cupHeight = 356;
+
+	int bpp = 1;
+
+	//File Names Definition
+	char cup_input[50] = "Images/cup.raw";
+	char fan_input[50] = "Images/fan.raw";
+	char maze_input[50] = "Images/maze.raw";
+
+	char cup_mask[50] = "Images/cup_mask.raw";
+	char cup_shrink[50] = "Images/cup_shrink.raw";
+	char cup_thin[50] = "Images/cup_thin.raw";
+	char cup_skeleton[50] = "Images/cup_skeleton.raw";
+
+	char fan_mask[50] = "Images/fan_mask.raw";
+	char fan_shrink[50] = "Images/fan_shrink.raw";
+	char fan_thin[50] = "Images/fan_thin.raw";
+	char fan_skeleton[50] = "Images/fan_skeleton.raw";
+
+	char maze_mask[50] = "Images/maze_mask.raw";
+	char maze_shrink[50] = "Images/maze_shrink.raw";
+	char maze_thin[50] = "Images/maze_thin.raw";
+	char maze_skeleton[50] = "Images/maze_skeleton.raw";
+
+	//Construct the Objects
+	Image cupInput(cupWidth, cupHeight, bpp, cup_input);
+	Image fanInput(imageWidth, imageHeight, bpp, fan_input);
+	Image mazeInput(imageWidth, imageHeight, bpp, maze_input);
+
+	Image cupMask(cupWidth, cupHeight, bpp, cup_mask);
+	Image cupShrink(cupWidth, cupHeight, bpp, cup_shrink);
+	Image cupThin(cupWidth, cupHeight, bpp, cup_thin);
+	Image cupSkeleton(cupWidth, cupHeight, bpp, cup_skeleton);
+
+	Image fanMask(imageWidth, imageHeight, bpp, fan_mask);
+	Image fanShrink(imageWidth, imageHeight, bpp, fan_shrink);
+	Image fanThin(imageWidth, imageHeight, bpp, fan_thin);
+	Image fanSkeleton(imageWidth, imageHeight, bpp, fan_skeleton);
+
+	Image mazeMask(imageWidth, imageHeight, bpp, maze_mask);
+	Image mazeShrink(imageWidth, imageHeight, bpp, maze_shrink);
+	Image mazeThin(imageWidth, imageHeight, bpp, maze_thin);
+	Image mazeSkeleton(imageWidth, imageHeight, bpp, maze_skeleton);
+
+	//Initialize Objects
+	cupInput.initialize();
+	fanInput.initialize();
+	mazeInput.initialize();
+
+	cupMask.initialize();
+	cupShrink.initialize();
+	cupThin.initialize();
+	cupSkeleton.initialize();
+
+	fanMask.initialize();
+	fanShrink.initialize();
+	fanThin.initialize();
+	fanSkeleton.initialize();
+
+	mazeMask.initialize();
+	mazeShrink.initialize();
+	mazeThin.initialize();
+	mazeSkeleton.initialize();
+
+	//Read the Input Files
+	cupInput.readFile();
+	fanInput.readFile();
+	mazeInput.readFile();
+
+	//Do the Shrinking Job
+	cupInput.imgShrink(cupMask, cupShrink, 128);
+	fanInput.imgShrink(fanMask, fanShrink, 128);
+	mazeInput.imgShrink(mazeMask, mazeShrink, 128);
+
+	//Do the Thinning Job
+	cupInput.imgThin(cupMask, cupThin, 128);
+	fanInput.imgThin(fanMask, fanThin, 128);
+	mazeInput.imgThin(mazeMask, mazeThin, 128);
+
+	//Do the Skeletonizing Job
+	cupInput.imgSkeleton(cupMask, cupSkeleton, 128);
+	fanInput.imgSkeleton(fanMask, fanSkeleton, 128);
+	mazeInput.imgSkeleton(mazeMask, mazeSkeleton, 128);
+
+	//Write File
+	fanShrink.writeFile();
+	cupShrink.writeFile();
+	mazeShrink.writeFile();
+
+	cupThin.writeFile();
+	fanThin.writeFile();
+	mazeThin.writeFile();
+
+	cupSkeleton.writeFile();
+	fanSkeleton.writeFile();
+	mazeSkeleton.writeFile();
+
+	return 0;
+}
+
+#include <iostream>
+#include "image.h"
+
+using namespace std;
+
+int main()
+{
+	//Define the Size the Gallery Image
+	int starWidth = 640;
+	int starHeight = 480;
+	int bpp = 1;
+
+	//Output Names
+	char star_input[50] = "Images/stars.raw";
+	char star_mask[50] = "Images/stars_mask.raw";
+	char star_count[50] = "Images/stars_count.raw";
+	char star_shrink[50] = "Images/stars_shrink.raw";
+	char star_thin[50] = "Images/stars_thin.raw";
+	char star_skeleton[50] = "Images/stars_skeleton.raw";
+
+	//Construct Image Objects
+	Image starInput(starWidth, starHeight, bpp, star_input);
+	Image starMask(starWidth, starHeight, bpp, star_mask);
+	Image starCount(starWidth, starHeight, bpp, star_count);
+	Image starShrink(starWidth, starHeight, bpp, star_shrink);
+	Image starThin(starWidth, starHeight, bpp, star_thin);
+	Image starSkeleton(starWidth, starHeight, bpp, star_skeleton);
+
+	//Read File
+	starInput.readFile();
+
+	//Do the Counting Job
+	starInput.imgShrink(starMask, starShrink, 128);
+	starInput.imgConnect(starCount, 128, 1, true);
+	starInput.countStar(starShrink);
+
+	//Write File
+	starShrink.writeFile();
+	starCount.writeFile();
+}
+
+#include <iostream>
+#include "image.h"
+
+using namespace std;
+
+int main()
+{
+	//Define the Size the Gallery Image
+	int pcbWidth = 372;
+	int pcbHeight = 239;
+	int bpp = 1;
+
+	//Output Names
+	char pcb_input[50] = "Images/PCB.raw";
+	char pcb_mask[50] = "Images/PCB_mask.raw";
+	char pcb_count[50] = "Images/PCB_count.raw";
+	char pcb_reverse[50] = "Images/PCB_reverse.raw";
+	char pcb_shrink[50] = "Images/PCB_shrink.raw";
+	char pcb_thin[50] = "Images/PCB_thin.raw";
+	char pcb_skeleton[50] = "Images/PCB_skeleton.raw";
+
+	//Construct Image Objects
+	Image pcbInput(pcbWidth, pcbHeight, bpp, pcb_input);
+	Image pcbReverse(pcbWidth, pcbHeight, bpp, pcb_reverse);
+	Image pcbMask(pcbWidth, pcbHeight, bpp, pcb_mask);
+	Image pcbCount(pcbWidth, pcbHeight, bpp, pcb_count);
+	Image pcbShrink(pcbWidth, pcbHeight, bpp, pcb_shrink);
+	Image pcbThin(pcbWidth, pcbHeight, bpp, pcb_thin);
+	Image pcbSkeleton(pcbWidth, pcbHeight, bpp, pcb_skeleton);
+
+	//Read File
+	pcbInput.readFile();
+
+
+	//Find # of Holes
+	pcbInput.imgShrink(pcbMask, pcbShrink, 50);
+	pcbShrink.countPoints(pcbInput);
+
+	//Find Path Ways
+	pcbInput.imgReverse(pcbReverse, 128);
+	pcbReverse.writeFile();
+	pcbReverse.imgThin(pcbMask, pcbThin, 128);
+	pcbThin.imgConnect(pcbCount, 128, 50, false);
+
+	//Write File
+	pcbShrink.writeFile();
+	pcbThin.writeFile();
+	pcbCount.writeFile();
+}
+
+#include <iostream>
+#include "image.h"
+
+using namespace std;
+
+int main()
+{
+	//Define the Size the Gallery Image
+	int gearWidth = 250;
+	int gearHeight = 250;
+	int bpp = 1;
+
+	//Output Names
+	char gear_input[50] = "Images/Geartooth.raw";
+	char gear_mask[50] = "Images/Geartooth_mask.raw";
+	char gear_reverse[50] = "Images/Geartooth_reverse.raw";
+	char gear_shrink[50] = "Images/Geartooth_shrink.raw";
+	char gear_thin[50] = "Images/Geartooth_thin.raw";
+	char gear_skeleton[50] = "Images/Geartooth_skeleton.raw";
+	char gear_miss[50] = "Images/Geartooth_miss.raw";
+
+	//Construct Image Objects
+	Image gearInput(gearWidth, gearHeight, bpp, gear_input);
+	Image gearReverse(gearWidth, gearHeight, bpp, gear_reverse);
+	Image gearMask(gearWidth, gearHeight, bpp, gear_mask);
+	Image gearShrink(gearWidth, gearHeight, bpp, gear_shrink);
+	Image gearThin(gearWidth, gearHeight, bpp, gear_thin);
+	Image gearSkeleton(gearWidth, gearHeight, bpp, gear_skeleton);
+	Image gearMiss(gearWidth, gearHeight, bpp, gear_miss);
+
+	//Read File
+	gearInput.readFile();
+
+	//Analyze the Geaer
+	//Reverse the Image
+	gearInput.imgReverse(gearReverse, 128);
+	//Shrink the Reverse Image
+	gearReverse.imgShrink(gearMask, gearShrink, 128);
+	gearInput.imgThin(gearMask, gearThin, 50);
+	//Analyze the Gear
+	gearShrink.analyzeGear(gearInput, gearReverse, gearMiss, gearThin);
+
+	//Write File
+	gearReverse.writeFile();
+	gearShrink.writeFile();
+	gearThin.writeFile();
+	gearMiss.writeFile();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
